@@ -310,6 +310,7 @@ function writeUserTemp(temp, timeDate, lat, lon) {
   }
 
 // Temperature feedback submission
+document.getElementById('submitTemp').addEventListener('click', submitTemperatureFeedback);
 function submitTemperatureFeedback() {
     const userTemp = parseFloat(document.getElementById('userTemperature').value);
     if (isNaN(userTemp)) return;
