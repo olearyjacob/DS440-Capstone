@@ -7,7 +7,7 @@ const DEEPSEEK_API_URL = 'https://api.deepseek.com/v1/chat/completions';
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
 import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-analytics.js";
-import { getDatabase, ref, child, get, push } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-database.js";
+import { getDatabase, ref, child, get, push, onValue } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-database.js";
 // TODO: Add SDKs for Firebase products that you want to use
 // https://firebase.google.com/docs/web/setup#available-libraries
 
@@ -62,6 +62,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeMap();
     initializeCharts();
     getCurrentLocation();
+    listenForUserTemps();
 });
 
 // Initialize map
@@ -351,19 +352,6 @@ async function updateForecastData(lat, lon) {
         const hourlyData = data.list.slice(0, 8);
         const hourlyLabels = hourlyData.map(item => formatTime(item.dt));
         
-        /*
-        const dbRef = ref(getDatabase());
-        get(child(dbRef, `users/${userId}`)).then((snapshot) => {
-        if (snapshot.exists()) {
-            const data = snapshot.val();
-        } else {
-            const data = "No data available";
-        }
-        }).catch((error) => {
-        console.error(error);
-        });
-        console.log(data);
-        */
 
         // Get user reported temperatures for matching times
         const userTemps = hourlyLabels.map(() => {
@@ -715,4 +703,51 @@ function appendMessage(role, content) {
     messageDiv.textContent = content;
     chatMessages.appendChild(messageDiv);
     chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+// Listen for changes in user-reported temperatures
+function listenForUserTemps() {
+    const db = getDatabase();
+    const userTempsRef = ref(db, 'users/');
+
+    onValue(userTempsRef, (snapshot) => {
+        const data = snapshot.val();
+        if (!data) return;
+
+        // Process the data into a usable format
+        const processedData = Object.values(data).map(entry => ({
+            temperature: entry.temperature,
+            timestamp: new Date(entry.time),
+            latitude: entry.latitude,
+            longitude: entry.longitude
+        }));
+
+        // Update the global userReportedTemps array
+        userReportedTemps = processedData;
+
+        // Update the chart with the new data
+        updateTemperatureChartWithFirebaseData();
+    });
+}
+
+// Update the chart with Firebase data
+function updateTemperatureChartWithFirebaseData() {
+    if (!hourlyTempChart) return;
+
+    const currentData = hourlyTempChart.data;
+
+    // Match Firebase data with the chart's time labels
+    const updatedUserTemps = currentData.labels.map(label => {
+        const matchingEntry = userReportedTemps.find(entry => {
+            const entryTime = formatTime(entry.timestamp.getTime() / 1000);
+            return entryTime === label;
+        });
+        return matchingEntry ? matchingEntry.temperature : null;
+    });
+
+    // Update the "User Reported" dataset
+    currentData.datasets[1].data = updatedUserTemps;
+
+    // Refresh the chart
+    hourlyTempChart.update();
 }
