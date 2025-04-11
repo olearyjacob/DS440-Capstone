@@ -389,45 +389,6 @@ async function updateForecastData(lat, lon) {
             ]
         });
 
-        // Process 5-day forecast data
-        const dailyData = [];
-        for (let i = 0; i < data.list.length; i += 8) {
-            dailyData.push(data.list[i]);
-        }
-        const dailyLabels = dailyData.map(item => formatDate(item.dt));
-
-        // Calculate average user-reported temperature for each day
-        const dailyUserAvgs = dailyLabels.map(date => {
-            const dayReports = userTemps.filter(report =>
-                formatDate(report.timestamp.getTime() / 1000) === date
-            );
-            if (dayReports.length === 0) return null;
-            const sum = dayReports.reduce((acc, curr) => acc + curr.temperature, 0);
-            return sum / dayReports.length;
-        });
-
-        // Update daily temperature chart
-        updateChartData(dailyTempChart, {
-            labels: dailyLabels,
-            datasets: [
-                {
-                    label: 'API Temperature (°C)',
-                    data: dailyData.map(item => item.main.temp),
-                    borderColor: 'rgb(255, 99, 132)',
-                    tension: 0.1,
-                    fill: false
-                },
-                {
-                    label: 'Average User Reported (°C)',
-                    data: dailyUserAvgs,
-                    borderColor: 'rgb(54, 162, 235)',
-                    tension: 0.1,
-                    borderDash: [5, 5],
-                    fill: false
-                }
-            ]
-        });
-
     } catch (error) {
         console.error('Error updating forecast:', error);
     }
@@ -447,6 +408,36 @@ async function fetchUserReportedTemps() {
         timestamp: new Date(entry.time)
     }));
 }
+
+// Ensure the chart is updated every time it is rendered
+function ensureTemperatureChartUpdates() {
+    if (!hourlyTempChart) return;
+
+    // Re-fetch user-reported data and update the chart
+    fetchUserReportedTemps().then(userTemps => {
+        const currentData = hourlyTempChart.data;
+
+        // Match user-reported temperatures with the chart's time labels
+        const updatedUserTemps = currentData.labels.map(label => {
+            const matchingEntry = userTemps.find(entry => {
+                const entryTime = formatTime(entry.timestamp.getTime() / 1000);
+                return entryTime === label;
+            });
+            return matchingEntry ? matchingEntry.temperature : null;
+        });
+
+        // Update the "User Reported" dataset
+        currentData.datasets[1].data = updatedUserTemps;
+
+        // Refresh the chart
+        hourlyTempChart.update();
+    });
+}
+
+// Call this function whenever the chart is rendered
+document.getElementById('hourly').addEventListener('click', () => {
+    ensureTemperatureChartUpdates();
+});
 
 // Update historical analysis
 async function updateHistoricalAnalysis(lat, lon) {
