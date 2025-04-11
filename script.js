@@ -573,6 +573,7 @@ function showError(message) {
 }
 
 // Settings functions
+document.getElementById('toggleSettings').addEventListener('click', toggleSettings);
 function toggleSettings() {
     document.getElementById('settingsPanel').classList.toggle('active');
 }
