@@ -7,7 +7,7 @@ const DEEPSEEK_API_URL = 'https://api.deepseek.com/v1/chat/completions';
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
 import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-analytics.js";
-import { getDatabase, ref, child, get, push, onValue } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-database.js";
+import { getDatabase, ref, child, get, push } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-database.js";
 // TODO: Add SDKs for Firebase products that you want to use
 // https://firebase.google.com/docs/web/setup#available-libraries
 
@@ -62,7 +62,6 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeMap();
     initializeCharts();
     getCurrentLocation();
-    listenForUserTemps();
 });
 
 // Initialize map
@@ -340,28 +339,38 @@ function submitTemperatureFeedback() {
     }, 3000);
 }
 
-// Update forecast data and include user-reported temperatures from Firebase
+// Update forecast data
 async function updateForecastData(lat, lon) {
     try {
         const response = await fetch(
             `https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&units=metric&appid=${OPENWEATHER_API_KEY}`
         );
         const data = await response.json();
-
+        
         // Process hourly data
         const hourlyData = data.list.slice(0, 8);
         const hourlyLabels = hourlyData.map(item => formatTime(item.dt));
+        
+        /*
+        const dbRef = ref(getDatabase());
+        get(child(dbRef, `users/${userId}`)).then((snapshot) => {
+        if (snapshot.exists()) {
+            const data = snapshot.val();
+        } else {
+            const data = "No data available";
+        }
+        }).catch((error) => {
+        console.error(error);
+        });
+        console.log(data);
+        */
 
-        // Fetch user-reported temperatures from Firebase
-        const userTemps = await fetchUserReportedTemps();
-
-        // Match user-reported temperatures with the chart's time labels
-        const updatedUserTemps = hourlyLabels.map(label => {
-            const matchingEntry = userTemps.find(entry => {
-                const entryTime = formatTime(entry.timestamp.getTime() / 1000);
-                return entryTime === label;
-            });
-            return matchingEntry ? matchingEntry.temperature : null;
+        // Get user reported temperatures for matching times
+        const userTemps = hourlyLabels.map(() => {
+            // Get the most recent user reported temperature, if any
+            return userReportedTemps.length > 0 ? 
+                userReportedTemps[userReportedTemps.length - 1].temperature : 
+                null;
         });
 
         // Update hourly temperature chart
@@ -376,7 +385,7 @@ async function updateForecastData(lat, lon) {
                 },
                 {
                     label: 'User Reported (°C)',
-                    data: updatedUserTemps,
+                    data: userTemps,
                     borderColor: 'rgb(54, 162, 235)',
                     tension: 0.1
                 },
@@ -389,55 +398,83 @@ async function updateForecastData(lat, lon) {
             ]
         });
 
+        // Update hourly precipitation chart
+        updateChartData(precipitationChart, {
+            labels: hourlyLabels,
+            datasets: [
+                {
+                    label: 'Rain (mm)',
+                    data: hourlyData.map(item => item.rain ? item.rain['3h'] : 0),
+                    backgroundColor: 'rgba(54, 162, 235, 0.5)'
+                },
+                {
+                    label: 'Snow (mm)',
+                    data: hourlyData.map(item => item.snow ? item.snow['3h'] : 0),
+                    backgroundColor: 'rgba(201, 203, 207, 0.5)'
+                }
+            ]
+        });
+
+        // Process 5-day forecast data
+        const dailyData = [];
+        for (let i = 0; i < data.list.length; i += 8) {
+            dailyData.push(data.list[i]);
+        }
+        const dailyLabels = dailyData.map(item => formatDate(item.dt));
+
+        // Calculate average user reported temperature for each day
+        const dailyUserAvgs = dailyLabels.map(date => {
+            const dayReports = userReportedTemps.filter(report => 
+                formatDate(report.timestamp.getTime() / 1000) === date
+            );
+            if (dayReports.length === 0) return null;
+            const sum = dayReports.reduce((acc, curr) => acc + curr.temperature, 0);
+            return sum / dayReports.length;
+        });
+
+        // Update daily temperature chart
+        updateChartData(dailyTempChart, {
+            labels: dailyLabels,
+            datasets: [
+                {
+                    label: 'API Temperature (°C)',
+                    data: dailyData.map(item => item.main.temp),
+                    borderColor: 'rgb(255, 99, 132)',
+                    tension: 0.1,
+                    fill: false
+                },
+                {
+                    label: 'Average User Reported (°C)',
+                    data: dailyUserAvgs,
+                    borderColor: 'rgb(54, 162, 235)',
+                    tension: 0.1,
+                    borderDash: [5, 5],
+                    fill: false
+                }
+            ]
+        });
+
+        // Update daily precipitation chart
+        updateChartData(precipitationChart, {
+            labels: dailyLabels,
+            datasets: [
+                {
+                    label: 'Rain (mm)',
+                    data: dailyData.map(item => item.rain ? item.rain['3h'] : 0),
+                    backgroundColor: 'rgba(54, 162, 235, 0.5)'
+                },
+                {
+                    label: 'Snow (mm)',
+                    data: dailyData.map(item => item.snow ? item.snow['3h'] : 0),
+                    backgroundColor: 'rgba(201, 203, 207, 0.5)'
+                }
+            ]
+        });
+
     } catch (error) {
         console.error('Error updating forecast:', error);
     }
 }
-
-// Fetch user-reported temperatures from Firebase
-async function fetchUserReportedTemps() {
-    const db = getDatabase();
-    const userTempsRef = ref(db, 'users/');
-    const snapshot = await get(userTempsRef);
-
-    if (!snapshot.exists()) return [];
-
-    // Process the data into a usable format
-    return Object.values(snapshot.val()).map(entry => ({
-        temperature: entry.temperature,
-        timestamp: new Date(entry.time)
-    }));
-}
-
-// Ensure the chart is updated every time it is rendered
-function ensureTemperatureChartUpdates() {
-    if (!hourlyTempChart) return;
-
-    // Re-fetch user-reported data and update the chart
-    fetchUserReportedTemps().then(userTemps => {
-        const currentData = hourlyTempChart.data;
-
-        // Match user-reported temperatures with the chart's time labels
-        const updatedUserTemps = currentData.labels.map(label => {
-            const matchingEntry = userTemps.find(entry => {
-                const entryTime = formatTime(entry.timestamp.getTime() / 1000);
-                return entryTime === label;
-            });
-            return matchingEntry ? matchingEntry.temperature : null;
-        });
-
-        // Update the "User Reported" dataset
-        currentData.datasets[1].data = updatedUserTemps;
-
-        // Refresh the chart
-        hourlyTempChart.update();
-    });
-}
-
-// Call this function whenever the chart is rendered
-document.getElementById('hourly').addEventListener('click', () => {
-    ensureTemperatureChartUpdates();
-});
 
 // Update historical analysis
 async function updateHistoricalAnalysis(lat, lon) {
@@ -679,57 +716,3 @@ function appendMessage(role, content) {
     chatMessages.appendChild(messageDiv);
     chatMessages.scrollTop = chatMessages.scrollHeight;
 }
-
-// Listen for changes in user-reported temperatures
-function listenForUserTemps() {
-    const db = getDatabase();
-    const userTempsRef = ref(db, 'users/');
-
-    onValue(userTempsRef, (snapshot) => {
-        const data = snapshot.val();
-        if (!data) return;
-
-        // Process the data into a usable format
-        userReportedTemps = Object.values(data).map(entry => ({
-            temperature: entry.temperature,
-            timestamp: new Date(entry.time)
-        }));
-
-        // Update the chart with the new data
-        updateTemperatureChartWithFirebaseData();
-    });
-}
-
-// Update the chart with Firebase data (last 24 hours only)
-function updateTemperatureChartWithFirebaseData() {
-    if (!hourlyTempChart) return;
-
-    const currentData = hourlyTempChart.data;
-    const now = new Date();
-
-    // Filter user-reported temperatures to include only the last 24 hours
-    const filteredUserTemps = userReportedTemps.filter(entry => {
-        const timeDifference = now - entry.timestamp; // Difference in milliseconds
-        return timeDifference <= 24 * 60 * 60 * 1000; // 24 hours in milliseconds
-    });
-
-    // Match filtered Firebase data with the chart's time labels
-    const updatedUserTemps = currentData.labels.map(label => {
-        const matchingEntry = filteredUserTemps.find(entry => {
-            const entryTime = formatTime(entry.timestamp.getTime() / 1000);
-            return entryTime === label;
-        });
-        return matchingEntry ? matchingEntry.temperature : null;
-    });
-
-    // Update the "User Reported" dataset
-    currentData.datasets[1].data = updatedUserTemps;
-
-    // Refresh the chart
-    hourlyTempChart.update();
-}
-
-// Call the listener when the app initializes
-document.addEventListener('DOMContentLoaded', () => {
-    listenForUserTemps();
-});
