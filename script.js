@@ -725,15 +725,22 @@ function listenForUserTemps() {
     });
 }
 
-// Update the chart with Firebase data
+// Update the chart with Firebase data (last 24 hours only)
 function updateTemperatureChartWithFirebaseData() {
     if (!hourlyTempChart) return;
 
     const currentData = hourlyTempChart.data;
+    const now = new Date();
 
-    // Match Firebase data with the chart's time labels
+    // Filter user-reported temperatures to include only the last 24 hours
+    const filteredUserTemps = userReportedTemps.filter(entry => {
+        const timeDifference = now - entry.timestamp; // Difference in milliseconds
+        return timeDifference <= 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+    });
+
+    // Match filtered Firebase data with the chart's time labels
     const updatedUserTemps = currentData.labels.map(label => {
-        const matchingEntry = userReportedTemps.find(entry => {
+        const matchingEntry = filteredUserTemps.find(entry => {
             const entryTime = formatTime(entry.timestamp.getTime() / 1000);
             return entryTime === label;
         });
