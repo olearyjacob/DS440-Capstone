@@ -351,33 +351,26 @@ async function updateForecastData(lat, lon) {
         const hourlyData = data.list.slice(0, 8);
         const hourlyLabels = hourlyData.map(item => formatTime(item.dt));
         
-        // Fetch user reported temperatures from Firebase
+        /*
         const dbRef = ref(getDatabase());
-        const snapshot = await get(child(dbRef, 'users/'));
-        let aggregatedTemps = {};
-        
+        get(child(dbRef, `users/${userId}`)).then((snapshot) => {
         if (snapshot.exists()) {
-            // Group temperatures by timestamp
-            snapshot.forEach((child) => {
-                const data = child.val();
-                const time = formatTime(new Date(data.time).getTime() / 1000);
-                if (!aggregatedTemps[time]) {
-                    aggregatedTemps[time] = {
-                        sum: 0,
-                        count: 0
-                    };
-                }
-                aggregatedTemps[time].sum += parseFloat(data.temperature);
-                aggregatedTemps[time].count++;
-            });
+            const data = snapshot.val();
+        } else {
+            const data = "No data available";
         }
+        }).catch((error) => {
+        console.error(error);
+        });
+        console.log(data);
+        */
 
-        // Calculate average temperatures for each time slot
-        const userTemps = hourlyLabels.map(label => {
-            if (aggregatedTemps[label]) {
-                return aggregatedTemps[label].sum / aggregatedTemps[label].count;
-            }
-            return null;
+        // Get user reported temperatures for matching times
+        const userTemps = hourlyLabels.map(() => {
+            // Get the most recent user reported temperature, if any
+            return userReportedTemps.length > 0 ? 
+                userReportedTemps[userReportedTemps.length - 1].temperature : 
+                null;
         });
 
         // Update hourly temperature chart
@@ -405,22 +398,74 @@ async function updateForecastData(lat, lon) {
             ]
         });
 
-        // Process precipitation data
-        const rainData = hourlyData.map(item => item.rain ? item.rain['3h'] || 0 : 0);
-        const snowData = hourlyData.map(item => item.snow ? item.snow['3h'] || 0 : 0);
-
-        // Update precipitation chart
+        // Update hourly precipitation chart
         updateChartData(precipitationChart, {
             labels: hourlyLabels,
             datasets: [
                 {
                     label: 'Rain (mm)',
-                    data: rainData,
+                    data: hourlyData.map(item => item.rain ? item.rain['3h'] : 0),
                     backgroundColor: 'rgba(54, 162, 235, 0.5)'
                 },
                 {
                     label: 'Snow (mm)',
-                    data: snowData,
+                    data: hourlyData.map(item => item.snow ? item.snow['3h'] : 0),
+                    backgroundColor: 'rgba(201, 203, 207, 0.5)'
+                }
+            ]
+        });
+
+        // Process 5-day forecast data
+        const dailyData = [];
+        for (let i = 0; i < data.list.length; i += 8) {
+            dailyData.push(data.list[i]);
+        }
+        const dailyLabels = dailyData.map(item => formatDate(item.dt));
+
+        // Calculate average user reported temperature for each day
+        const dailyUserAvgs = dailyLabels.map(date => {
+            const dayReports = userReportedTemps.filter(report => 
+                formatDate(report.timestamp.getTime() / 1000) === date
+            );
+            if (dayReports.length === 0) return null;
+            const sum = dayReports.reduce((acc, curr) => acc + curr.temperature, 0);
+            return sum / dayReports.length;
+        });
+
+        // Update daily temperature chart
+        updateChartData(dailyTempChart, {
+            labels: dailyLabels,
+            datasets: [
+                {
+                    label: 'API Temperature (°C)',
+                    data: dailyData.map(item => item.main.temp),
+                    borderColor: 'rgb(255, 99, 132)',
+                    tension: 0.1,
+                    fill: false
+                },
+                {
+                    label: 'Average User Reported (°C)',
+                    data: dailyUserAvgs,
+                    borderColor: 'rgb(54, 162, 235)',
+                    tension: 0.1,
+                    borderDash: [5, 5],
+                    fill: false
+                }
+            ]
+        });
+
+        // Update daily precipitation chart
+        updateChartData(precipitationChart, {
+            labels: dailyLabels,
+            datasets: [
+                {
+                    label: 'Rain (mm)',
+                    data: dailyData.map(item => item.rain ? item.rain['3h'] : 0),
+                    backgroundColor: 'rgba(54, 162, 235, 0.5)'
+                },
+                {
+                    label: 'Snow (mm)',
+                    data: dailyData.map(item => item.snow ? item.snow['3h'] : 0),
                     backgroundColor: 'rgba(201, 203, 207, 0.5)'
                 }
             ]
