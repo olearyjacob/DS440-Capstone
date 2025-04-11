@@ -615,8 +615,8 @@ function loadUserPreferences() {
 }
 
 // Forecast tab switching
-document.getElementById('hourly').addEventListener('click', switchForecast('hourly'));
-document.getElementById('daily').addEventListener('click', switchForecast('daily'));
+document.getElementById('hourly').addEventListener('click', () => switchForecast('hourly'));
+document.getElementById('daily').addEventListener('click', () => switchForecast('daily'));
 function switchForecast(type) {
     // Hide all forecast content
     document.querySelectorAll('.forecast-content').forEach(el => {
