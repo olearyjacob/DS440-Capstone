@@ -351,6 +351,7 @@ async function updateForecastData(lat, lon) {
         const hourlyData = data.list.slice(0, 8);
         const hourlyLabels = hourlyData.map(item => formatTime(item.dt));
         
+        /*
         const dbRef = ref(getDatabase());
         get(child(dbRef, `users/${userId}`)).then((snapshot) => {
         if (snapshot.exists()) {
@@ -362,6 +363,7 @@ async function updateForecastData(lat, lon) {
         console.error(error);
         });
         console.log(data);
+        */
 
         // Get user reported temperatures for matching times
         const userTemps = hourlyLabels.map(() => {
