@@ -339,43 +339,45 @@ function submitTemperatureFeedback() {
     }, 3000);
 }
 
-// Fetch user-reported temperatures from Firebase
-async function fetchUserReportedTemps() {
-    const db = getDatabase();
-    const userTempsRef = ref(db, 'users/');
-    const snapshot = await get(userTempsRef);
-
-    if (!snapshot.exists()) return [];
-
-    // Process the data into a usable format
-    return Object.values(snapshot.val()).map(entry => ({
-        temperature: entry.temperature,
-        timestamp: new Date(entry.time)
-    }));
-}
-
-// Update forecast data and include user-reported temperatures from Firebase
+// Update forecast data
 async function updateForecastData(lat, lon) {
     try {
         const response = await fetch(
             `https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&units=metric&appid=${OPENWEATHER_API_KEY}`
         );
         const data = await response.json();
-
+        
         // Process hourly data
         const hourlyData = data.list.slice(0, 8);
         const hourlyLabels = hourlyData.map(item => formatTime(item.dt));
-
-        // Fetch user-reported temperatures from Firebase
-        const userTemps = await fetchUserReportedTemps();
-
-        // Match user-reported temperatures with the chart's time labels
-        const updatedUserTemps = hourlyLabels.map(label => {
-            const matchingEntry = userTemps.find(entry => {
-                const entryTime = formatTime(entry.timestamp.getTime() / 1000);
-                return entryTime === label;
+        
+        // Fetch user reported temperatures from Firebase
+        const dbRef = ref(getDatabase());
+        const snapshot = await get(child(dbRef, 'users/'));
+        let aggregatedTemps = {};
+        
+        if (snapshot.exists()) {
+            // Group temperatures by timestamp
+            snapshot.forEach((child) => {
+                const data = child.val();
+                const time = formatTime(new Date(data.time).getTime() / 1000);
+                if (!aggregatedTemps[time]) {
+                    aggregatedTemps[time] = {
+                        sum: 0,
+                        count: 0
+                    };
+                }
+                aggregatedTemps[time].sum += parseFloat(data.temperature);
+                aggregatedTemps[time].count++;
             });
-            return matchingEntry ? matchingEntry.temperature : null;
+        }
+
+        // Calculate average temperatures for each time slot
+        const userTemps = hourlyLabels.map(label => {
+            if (aggregatedTemps[label]) {
+                return aggregatedTemps[label].sum / aggregatedTemps[label].count;
+            }
+            return null;
         });
 
         // Update hourly temperature chart
@@ -390,7 +392,7 @@ async function updateForecastData(lat, lon) {
                 },
                 {
                     label: 'User Reported (°C)',
-                    data: updatedUserTemps,
+                    data: userTemps,
                     borderColor: 'rgb(54, 162, 235)',
                     tension: 0.1
                 },
@@ -399,6 +401,27 @@ async function updateForecastData(lat, lon) {
                     data: hourlyData.map(item => item.main.feels_like),
                     borderColor: 'rgb(75, 192, 192)',
                     tension: 0.1
+                }
+            ]
+        });
+
+        // Process precipitation data
+        const rainData = hourlyData.map(item => item.rain ? item.rain['3h'] || 0 : 0);
+        const snowData = hourlyData.map(item => item.snow ? item.snow['3h'] || 0 : 0);
+
+        // Update precipitation chart
+        updateChartData(precipitationChart, {
+            labels: hourlyLabels,
+            datasets: [
+                {
+                    label: 'Rain (mm)',
+                    data: rainData,
+                    backgroundColor: 'rgba(54, 162, 235, 0.5)'
+                },
+                {
+                    label: 'Snow (mm)',
+                    data: snowData,
+                    backgroundColor: 'rgba(201, 203, 207, 0.5)'
                 }
             ]
         });
