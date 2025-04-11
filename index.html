@@ -41,14 +41,14 @@
             <label>Default Location:</label>
             <input type="text" id="defaultLocation" placeholder="City name">
         </div>
-        <button onclick="saveSettings()">Save Settings</button>
+        <button id="saveSettings">Save Settings</button>
     </div>
 
     <div class="container">
         <div class="map-section">
             <div id="map"></div>
             <div class="map-controls">
-                <button onclick="getCurrentLocation()">📍 My Location</button>
+                <button id="getCurrentLocation">📍 My Location</button>
             </div>
         </div>
         
@@ -107,8 +107,8 @@
 
             <div class="forecast">
                 <div class="forecast-tabs">
-                    <button class="tab-button active" onclick="switchForecast('hourly')">Hourly</button>
-                    <button class="tab-button" onclick="switchForecast('daily')">5-Day</button>
+                    <button id="hourly" class="tab-button active">Hourly</button>
+                    <button id="daily" class="tab-button">5-Day</button>
                 </div>
                 
                 <div id="hourlyForecast" class="forecast-content">
@@ -160,7 +160,7 @@
                     </div>
                     <div class="chat-input-container">
                         <input type="text" id="chatInput" placeholder="Ask me about the weather...">
-                        <button onclick="sendMessage()">Send</button>
+                        <button id="sendMessage">Send</button>
                     </div>
                 </div>
             </div>

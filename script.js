@@ -202,6 +202,7 @@ function initializeCharts() {
 }
 
 // Get current location
+document.getElementById('getCurrentLocation').addEventListener('click', getCurrentLocation);
 function getCurrentLocation() {
     showLoading(true);
     if (navigator.geolocation) {
@@ -576,6 +577,7 @@ function toggleSettings() {
     document.getElementById('settingsPanel').classList.toggle('active');
 }
 
+document.getElementById('saveSettings').addEventListener('click', saveSettings);
 function saveSettings() {
     userPreferences = {
         tempUnit: document.getElementById('tempUnit').value,
@@ -598,6 +600,8 @@ function loadUserPreferences() {
 }
 
 // Forecast tab switching
+document.getElementById('hourly').addEventListener('click', switchForecast('hourly'));
+document.getElementById('daily').addEventListener('click', switchForecast('daily'));
 function switchForecast(type) {
     // Hide all forecast content
     document.querySelectorAll('.forecast-content').forEach(el => {
@@ -630,6 +634,7 @@ document.getElementById('chatInput').addEventListener('keypress', function(e) {
     }
 });
 
+document.getElementById('sendMessage').addEventListener('click', sendMessage);
 async function sendMessage() {
     const chatInput = document.getElementById('chatInput');
     const userMessage = chatInput.value.trim();
