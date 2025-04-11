@@ -628,7 +628,7 @@ function switchForecast(type) {
     
     // Show selected forecast content and activate tab
     document.getElementById(`${type}Forecast`).style.display = 'block';
-    document.querySelector(`button[onclick="switchForecast('${type}')"]`).classList.add('active');
+    document.querySelector(`button[id="${type}"]`).classList.add('active');
     
     // Update charts to fix any rendering issues
     if (type === 'hourly') {
