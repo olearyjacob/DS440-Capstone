@@ -307,7 +307,7 @@ function writeUserTemp(temp, timeDate, lat, lon) {
       latitude : lat,
       longitude: lon
     });
-  };
+  }
 
 // Temperature feedback submission
 function submitTemperatureFeedback() {
