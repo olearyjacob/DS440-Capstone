@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weather.io</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/universal-sentence-encoder"></script>
+</head>
+<body>
+    <div id="loadingOverlay" style="display: none;">
+        <div class="spinner"></div>
+    </div>
+
+    <header>
+        <h1>Weather.io</h1>
+        <div class="settings-icon" onclick="toggleSettings()">⚙️</div>
+    </header>
+    
+    <div class="settings-panel" id="settingsPanel">
+        <h3>Settings</h3>
+        <div class="setting-item">
+            <label>Temperature Unit:</label>
+            <select id="tempUnit">
+                <option value="celsius">Celsius</option>
+                <option value="fahrenheit">Fahrenheit</option>
+            </select>
+        </div>
+        <div class="setting-item">
+            <label>Time Format:</label>
+            <select id="timeFormat">
+                <option value="24h">24-hour</option>
+                <option value="12h">12-hour</option>
+            </select>
+        </div>
+        <div class="setting-item">
+            <label>Default Location:</label>
+            <input type="text" id="defaultLocation" placeholder="City name">
+        </div>
+        <button onclick="saveSettings()">Save Settings</button>
+    </div>
+
+    <div class="container">
+        <div class="map-section">
+            <div id="map"></div>
+            <div class="map-controls">
+                <button onclick="getCurrentLocation()">📍 My Location</button>
+            </div>
+        </div>
+        
+        <div class="weather-section">
+            <div class="current-weather">
+                <h2>Current Weather</h2>
+                <div class="weather-details">
+                    <div class="main-weather">
+                        <img id="weatherIcon" src="" alt="Weather icon">
+                        <div class="main-info">
+                            <p>Location: <span id="location">Loading...</span></p>
+                            <p>Temperature: <span id="temperature">--°C</span></p>
+                            <p>Feels Like: <span id="feels-like">--°C</span></p>
+                            <p>Condition: <span id="condition">--</span></p>
+                        </div>
+                    </div>
+                    
+                    <div class="detailed-weather">
+                        <div class="detail-item">
+                            <span class="label">Low/High:</span>
+                            <span id="low-high">--/--</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="label">Humidity:</span>
+                            <span id="humidity">--%</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="label">Wind:</span>
+                            <span id="wind">-- m/s</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="label">Pressure:</span>
+                            <span id="pressure">-- hPa</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="label">UV Index:</span>
+                            <span id="uv-index">--</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="label">Visibility:</span>
+                            <span id="visibility">-- km</span>
+                        </div>
+                    </div>
+
+                    <div class="weather-feedback">
+                        <h3>Temperature Feedback</h3>
+                        <div class="feedback-form">
+                            <p>Is the reported temperature accurate?</p>
+                            <input type="number" id="userTemperature" step="0.1" placeholder="Enter actual temperature">
+                            <button onclick="submitTemperatureFeedback()">Report Temperature</button>
+                        </div>
+                        <div id="feedbackMessage"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="forecast">
+                <div class="forecast-tabs">
+                    <button class="tab-button active" onclick="switchForecast('hourly')">Hourly</button>
+                    <button class="tab-button" onclick="switchForecast('daily')">5-Day</button>
+                </div>
+                
+                <div id="hourlyForecast" class="forecast-content">
+                    <div class="chart-container">
+                        <h3>Temperature</h3>
+                        <canvas id="temperatureChart"></canvas>
+                    </div>
+                </div>
+                
+                <div id="dailyForecast" class="forecast-content" style="display: none;">
+                    <div class="chart-container">
+                        <h3>5-Day Temperature</h3>
+                        <canvas id="dailyTemperatureChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="precipitation-section">
+                <h3>Precipitation Analysis</h3>
+                <div class="chart-container">
+                    <canvas id="precipitationChart"></canvas>
+                </div>
+            </div>
+
+            <div class="historical-section">
+                <h3>Historical Temperature Analysis</h3>
+                <div class="chart-container">
+                    <canvas id="historicalChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="assistant-section">
+            <div class="weather-assistant">
+                <h2>Weather Assistant</h2>
+                <div class="chat-container">
+                    <div class="chat-messages" id="chatMessages">
+                        <div class="assistant-message">
+                            Hello! I'm your Weather Assistant. I can help you with: 
+                            <ul>
+                                <li>Current weather conditions</li>
+                                <li>Weather forecasts</li>
+                                <li>Temperature trends</li>
+                                <li>Precipitation information</li>
+                                <li>Weather-related recommendations</li>
+                            </ul>
+                            Please select a location on the map, and feel free to ask me any weather-related questions!
+                        </div>
+                    </div>
+                    <div class="chat-input-container">
+                        <input type="text" id="chatInput" placeholder="Ask me about the weather...">
+                        <button onclick="sendMessage()">Send</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script type = "module" src="script.js"></script>
+</body>
+</html>
