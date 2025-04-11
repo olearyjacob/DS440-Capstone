@@ -715,15 +715,10 @@ function listenForUserTemps() {
         if (!data) return;
 
         // Process the data into a usable format
-        const processedData = Object.values(data).map(entry => ({
+        userReportedTemps = Object.values(data).map(entry => ({
             temperature: entry.temperature,
-            timestamp: new Date(entry.time),
-            latitude: entry.latitude,
-            longitude: entry.longitude
+            timestamp: new Date(entry.time)
         }));
-
-        // Update the global userReportedTemps array
-        userReportedTemps = processedData;
 
         // Update the chart with the new data
         updateTemperatureChartWithFirebaseData();
@@ -751,3 +746,8 @@ function updateTemperatureChartWithFirebaseData() {
     // Refresh the chart
     hourlyTempChart.update();
 }
+
+// Call the listener when the app initializes
+document.addEventListener('DOMContentLoaded', () => {
+    listenForUserTemps();
+});
