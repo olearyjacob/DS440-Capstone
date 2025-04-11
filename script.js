@@ -7,7 +7,7 @@ const DEEPSEEK_API_URL = 'https://api.deepseek.com/v1/chat/completions';
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
 import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-analytics.js";
-import { getDatabase, ref, set, push } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-database.js";
+import { getDatabase, ref, child, get, push } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-database.js";
 // TODO: Add SDKs for Firebase products that you want to use
 // https://firebase.google.com/docs/web/setup#available-libraries
 
@@ -351,6 +351,18 @@ async function updateForecastData(lat, lon) {
         const hourlyData = data.list.slice(0, 8);
         const hourlyLabels = hourlyData.map(item => formatTime(item.dt));
         
+        const dbRef = ref(getDatabase());
+        get(child(dbRef, `users/${userId}`)).then((snapshot) => {
+        if (snapshot.exists()) {
+            const data = snapshot.val();
+        } else {
+            const data = "No data available";
+        }
+        }).catch((error) => {
+        console.error(error);
+        });
+        console.log(data);
+
         // Get user reported temperatures for matching times
         const userTemps = hourlyLabels.map(() => {
             // Get the most recent user reported temperature, if any
