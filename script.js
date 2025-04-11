@@ -340,25 +340,28 @@ function submitTemperatureFeedback() {
     }, 3000);
 }
 
-// Update forecast data
+// Update forecast data and include user-reported temperatures from Firebase
 async function updateForecastData(lat, lon) {
     try {
         const response = await fetch(
             `https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&units=metric&appid=${OPENWEATHER_API_KEY}`
         );
         const data = await response.json();
-        
+
         // Process hourly data
         const hourlyData = data.list.slice(0, 8);
         const hourlyLabels = hourlyData.map(item => formatTime(item.dt));
-        
 
-        // Get user reported temperatures for matching times
-        const userTemps = hourlyLabels.map(() => {
-            // Get the most recent user reported temperature, if any
-            return userReportedTemps.length > 0 ? 
-                userReportedTemps[userReportedTemps.length - 1].temperature : 
-                null;
+        // Fetch user-reported temperatures from Firebase
+        const userTemps = await fetchUserReportedTemps();
+
+        // Match user-reported temperatures with the chart's time labels
+        const updatedUserTemps = hourlyLabels.map(label => {
+            const matchingEntry = userTemps.find(entry => {
+                const entryTime = formatTime(entry.timestamp.getTime() / 1000);
+                return entryTime === label;
+            });
+            return matchingEntry ? matchingEntry.temperature : null;
         });
 
         // Update hourly temperature chart
@@ -373,7 +376,7 @@ async function updateForecastData(lat, lon) {
                 },
                 {
                     label: 'User Reported (°C)',
-                    data: userTemps,
+                    data: updatedUserTemps,
                     borderColor: 'rgb(54, 162, 235)',
                     tension: 0.1
                 },
@@ -386,23 +389,6 @@ async function updateForecastData(lat, lon) {
             ]
         });
 
-        // Update hourly precipitation chart
-        updateChartData(precipitationChart, {
-            labels: hourlyLabels,
-            datasets: [
-                {
-                    label: 'Rain (mm)',
-                    data: hourlyData.map(item => item.rain ? item.rain['3h'] : 0),
-                    backgroundColor: 'rgba(54, 162, 235, 0.5)'
-                },
-                {
-                    label: 'Snow (mm)',
-                    data: hourlyData.map(item => item.snow ? item.snow['3h'] : 0),
-                    backgroundColor: 'rgba(201, 203, 207, 0.5)'
-                }
-            ]
-        });
-
         // Process 5-day forecast data
         const dailyData = [];
         for (let i = 0; i < data.list.length; i += 8) {
@@ -410,9 +396,9 @@ async function updateForecastData(lat, lon) {
         }
         const dailyLabels = dailyData.map(item => formatDate(item.dt));
 
-        // Calculate average user reported temperature for each day
+        // Calculate average user-reported temperature for each day
         const dailyUserAvgs = dailyLabels.map(date => {
-            const dayReports = userReportedTemps.filter(report => 
+            const dayReports = userTemps.filter(report =>
                 formatDate(report.timestamp.getTime() / 1000) === date
             );
             if (dayReports.length === 0) return null;
@@ -442,26 +428,24 @@ async function updateForecastData(lat, lon) {
             ]
         });
 
-        // Update daily precipitation chart
-        updateChartData(precipitationChart, {
-            labels: dailyLabels,
-            datasets: [
-                {
-                    label: 'Rain (mm)',
-                    data: dailyData.map(item => item.rain ? item.rain['3h'] : 0),
-                    backgroundColor: 'rgba(54, 162, 235, 0.5)'
-                },
-                {
-                    label: 'Snow (mm)',
-                    data: dailyData.map(item => item.snow ? item.snow['3h'] : 0),
-                    backgroundColor: 'rgba(201, 203, 207, 0.5)'
-                }
-            ]
-        });
-
     } catch (error) {
         console.error('Error updating forecast:', error);
     }
+}
+
+// Fetch user-reported temperatures from Firebase
+async function fetchUserReportedTemps() {
+    const db = getDatabase();
+    const userTempsRef = ref(db, 'users/');
+    const snapshot = await get(userTempsRef);
+
+    if (!snapshot.exists()) return [];
+
+    // Process the data into a usable format
+    return Object.values(snapshot.val()).map(entry => ({
+        temperature: entry.temperature,
+        timestamp: new Date(entry.time)
+    }));
 }
 
 // Update historical analysis
